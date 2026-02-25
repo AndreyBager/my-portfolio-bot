@@ -171,7 +171,11 @@ async def add_item_photo(message: Message, state: FSMContext):
 
 async def main():
     await async_main()
-    await dp.start_polling(bot)
+    # Добавляем параметр handle_signals=False
+    # Это отключит попытку бота лезть в управление системой, 
+    # что и вызывает ошибку на Render
+    await dp.start_polling(bot, handle_signals=False) 
 
 if __name__ == "__main__":
     asyncio.run(main())
+
