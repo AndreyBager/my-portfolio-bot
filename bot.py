@@ -1,3 +1,5 @@
+import os
+from aiogram import Bot, Dispatcher
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher, F
@@ -15,7 +17,8 @@ from kb import main_menu, portfolio_categories, back_button
 # Настройки
 logging.basicConfig(level=logging.INFO)
 ADMIN_ID = 8344208200 
-TOKEN = "8402541522:AAEaRLKDEfxHGG49nJRfM8b5pxXOmouUQyc"
+TOKEN = os.getenv("BOT_TOKEN") 
+bot = Bot(token=TOKEN)
 
 # Ссылки на картинки
 MAIN_IMG = "https://i.postimg.cc/PJkWFWYX/cover-4.jpg"
@@ -215,4 +218,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
+
         pass
