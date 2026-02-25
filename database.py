@@ -18,7 +18,7 @@ class Item(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[str] = mapped_column(String(500))
-    photo_id: Mapped[str] = mapped_column(String(255)) 
+    photo_id: Mapped[str] = mapped_column(String(255), nullable=True) 
     category: Mapped[str] = mapped_column(String(50))
 
 # --- ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ---
@@ -39,3 +39,4 @@ async def delete_item_from_db(item_id: int):
     async with async_session() as session:
         async with session.begin():
             await session.execute(delete(Item).where(Item.id == item_id))
+
