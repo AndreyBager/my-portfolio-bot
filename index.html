@@ -9,6 +9,16 @@
     <style>
         body { background-color: var(--tg-theme-bg-color, #1c1c1d); color: var(--tg-theme-text-color, white); }
         .card { background-color: var(--tg-theme-secondary-bg-color, #2c2c2e); }
+        /* Стили для полей ввода, чтобы они вписывались в тему Telegram */
+        input, textarea { 
+            background: rgba(255,255,255,0.05); 
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
     </style>
 </head>
 <body class="p-4 font-sans">
@@ -25,8 +35,6 @@
 
         async function loadItems() {
             try {
-                // Мы используем относительный путь /items. 
-                // Когда сайт и API на одном сервере, это сработает идеально.
                 const response = await fetch('/items');
                 const items = await response.json();
                 
@@ -37,18 +45,72 @@
                 }
 
                 container.innerHTML = items.map(item => `
-                    <div class="card p-4 rounded-2xl shadow-xl border border-gray-800">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <span class="text-[10px] uppercase text-blue-400 font-bold">${item.category}</span>
-                                <h3 class="font-bold text-lg">${item.name}</h3>
-                            </div>
+                    <div class="card p-4 rounded-2xl shadow-xl border border-gray-800 flex flex-col gap-3">
+                        ${item.photo_id 
+                            ? `<img src="${item.photo_id}" class="w-full h-32 object-cover rounded-xl mb-2">` 
+                            : `<div class="w-full h-32 bg-gray-800 rounded-xl mb-2 flex items-center justify-center text-xs text-gray-500 italic">Без фото</div>`
+                        }
+
+                        <div class="flex flex-col gap-2">
+                            <span class="text-[10px] uppercase text-blue-400 font-bold tracking-widest">${item.category}</span>
+                            
+                            <input type="text" id="name-${item.id}" value="${item.name}" 
+                                   class="font-bold text-lg px-2 py-1 rounded-lg">
+                            
+                            <textarea id="desc-${item.id}" rows="3" 
+                                      class="text-sm text-gray-400 px-2 py-1 rounded-lg w-full">${item.description}</textarea>
                         </div>
-                        <p class="text-sm text-gray-400 mt-2">${item.description}</p>
+
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="saveItem(${item.id})" 
+                                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl text-sm transition">
+                                Сохранить
+                            </button>
+                            <button onclick="deleteItem(${item.id})" 
+                                    class="bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white px-4 py-2 rounded-xl text-sm transition border border-red-500/50">
+                                Удалить
+                            </button>
+                        </div>
                     </div>
                 `).join('');
             } catch (e) {
                 document.getElementById('items-list').innerHTML = '<p class="text-red-500 text-center">Ошибка загрузки</p>';
+            }
+        }
+
+        // Функция сохранения изменений
+        async function saveItem(id) {
+            const newName = document.getElementById(`name-${id}`).value;
+            const newDesc = document.getElementById(`desc-${id}`).value;
+
+            try {
+                const response = await fetch(`/items/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName, description: newDesc })
+                });
+
+                if (response.ok) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                    alert('Изменения сохранены!');
+                }
+            } catch (e) {
+                alert('Ошибка при сохранении');
+            }
+        }
+
+        // Функция удаления
+        async function deleteItem(id) {
+            if (!confirm('Удалить эту работу?')) return;
+
+            try {
+                const response = await fetch(`/items/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    tg.HapticFeedback.notificationOccurred('warning');
+                    loadItems(); // Перезагружаем список
+                }
+            } catch (e) {
+                alert('Ошибка при удалении');
             }
         }
 
