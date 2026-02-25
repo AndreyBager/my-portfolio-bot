@@ -74,6 +74,21 @@ async def back_to_main(callback: CallbackQuery):
     )
     await callback.answer()
 
+@dp.callback_query(F.data == "skip_photo")
+async def skip_photo_handler(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    async with async_session() as session:
+        async with session.begin():
+            new_item = Item(
+                name=data['name'],
+                description=data['description'],
+                category=data['category'],
+                photo_id=None # База теперь это разрешает
+            )
+            session.add(new_item)
+    await callback.message.edit_text("✅ Работа добавлена без фотографии!")
+    await state.clear()
+    await callback.answer()
 # --- ВЫВОД РАБОТ ---
 
 @dp.callback_query(F.data.startswith("cat_"))
@@ -151,7 +166,11 @@ async def add_item_name(message: Message, state: FSMContext):
 async def add_item_desc(message: Message, state: FSMContext):
     await state.update_data(description=message.text)
     await state.set_state(AddItem.photo)
-    await message.answer("Отправьте фото работы:")
+    
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="⏩ Пропустить фото", callback_data="skip_photo"))
+    
+    await message.answer("Отправьте фото или нажмите кнопку пропуска:", reply_markup=kb.as_markup())
 
 @dp.message(AddItem.photo, F.photo)
 async def add_item_photo(message: Message, state: FSMContext):
@@ -178,4 +197,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
