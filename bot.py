@@ -7,7 +7,7 @@ from aiogram.types import Message, CallbackQuery, InputMediaPhoto, InlineKeyboar
 from aiogram.fsm.state import StatesGroup, State 
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 # ИЗ ТВОИХ ФАЙЛОВ
 from database import async_main, async_session, Item, get_items_by_category, delete_item_from_db
@@ -74,21 +74,6 @@ async def back_to_main(callback: CallbackQuery):
     )
     await callback.answer()
 
-@dp.callback_query(F.data == "skip_photo")
-async def skip_photo_handler(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    async with async_session() as session:
-        async with session.begin():
-            new_item = Item(
-                name=data['name'],
-                description=data['description'],
-                category=data['category'],
-                photo_id=None # База теперь это разрешает
-            )
-            session.add(new_item)
-    await callback.message.edit_text("✅ Работа добавлена без фотографии!")
-    await state.clear()
-    await callback.answer()
 # --- ВЫВОД РАБОТ ---
 
 @dp.callback_query(F.data.startswith("cat_"))
@@ -96,35 +81,31 @@ async def show_category_items(callback: CallbackQuery):
     category = callback.data.split('_')[1]
     items = await get_items_by_category(category)
     
-    if category == "bots":
-        await callback.message.delete()
-        text = "🤖 **СПИСОК РАЗРАБОТАННЫХ БОТОВ**\n\n"
-        # Твой статичный список...
-        text += "🔗 Ссылка: @Bager_godbot\n\n"
+    if not items:
+        await callback.answer("В этом разделе пока пусто.", show_alert=True)
+        return
+
+    await callback.message.delete()
+    
+    for item in items:
+        item_kb = InlineKeyboardBuilder()
+        if callback.from_user.id == ADMIN_ID:
+            item_kb.row(InlineKeyboardButton(text="🗑 Удалить", callback_data=f"delete_{item.id}"))
+        item_kb.row(InlineKeyboardButton(text="⬅️ Назад в категории", callback_data="open_portfolio"))
         
-        kb = InlineKeyboardBuilder()
-        if items:
-            text += "➕ **Другие работы:**\n"
-            for item in items:
-                text += f"▪️ **{item.name}**\n{item.description}\n\n"
-                if callback.from_user.id == ADMIN_ID:
-                    kb.row(InlineKeyboardButton(text=f"🗑 Удалить {item.name}", callback_data=f"delete_{item.id}"))
+        caption = f"🔥 **{item.name}**\n\n{item.description}"
         
-        kb.row(InlineKeyboardButton(text="⬅️ Назад в категории", callback_data="open_portfolio"))
-        await callback.message.answer(text=text, reply_markup=kb.as_markup(), parse_mode="Markdown")
-    else:
-        if not items:
-            await callback.answer("В этом разделе пока пусто.", show_alert=True)
-            return
-        await callback.message.delete()
-        for item in items:
-            item_kb = InlineKeyboardBuilder()
-            if callback.from_user.id == ADMIN_ID:
-                item_kb.row(InlineKeyboardButton(text="🗑 Удалить", callback_data=f"delete_{item.id}"))
-            item_kb.row(InlineKeyboardButton(text="⬅️ Назад в категории", callback_data="open_portfolio"))
+        # ПРОВЕРКА: Если фото есть - шлем фото, если нет - только текст
+        if item.photo_id:
             await callback.message.answer_photo(
                 photo=item.photo_id,
-                caption=f"🔥 **{item.name}**\n\n{item.description}",
+                caption=caption,
+                reply_markup=item_kb.as_markup(),
+                parse_mode="Markdown"
+            )
+        else:
+            await callback.message.answer(
+                text=caption,
                 reply_markup=item_kb.as_markup(),
                 parse_mode="Markdown"
             )
@@ -172,6 +153,22 @@ async def add_item_desc(message: Message, state: FSMContext):
     
     await message.answer("Отправьте фото или нажмите кнопку пропуска:", reply_markup=kb.as_markup())
 
+@dp.callback_query(F.data == "skip_photo")
+async def skip_photo_handler(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    async with async_session() as session:
+        async with session.begin():
+            new_item = Item(
+                name=data['name'],
+                description=data['description'],
+                category=data['category'],
+                photo_id=None
+            )
+            session.add(new_item)
+    await callback.message.answer("✅ Работа добавлена без фотографии!")
+    await state.clear()
+    await callback.answer()
+
 @dp.message(AddItem.photo, F.photo)
 async def add_item_photo(message: Message, state: FSMContext):
     photo_id = message.photo[-1].file_id
@@ -188,14 +185,16 @@ async def add_item_photo(message: Message, state: FSMContext):
     await message.answer("✅ Работа успешно добавлена!")
     await state.clear()
 
+@dp.callback_query(F.data.startswith("delete_"))
+async def delete_item_handler(callback: CallbackQuery):
+    item_id = int(callback.data.split("_")[1])
+    await delete_item_from_db(item_id)
+    await callback.answer("Работа удалена!")
+    await callback.message.delete()
+
 async def main():
     await async_main()
-    # Добавляем параметр handle_signals=False
-    # Это отключит попытку бота лезть в управление системой, 
-    # что и вызывает ошибку на Render
     await dp.start_polling(bot, handle_signals=False) 
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
