@@ -155,7 +155,7 @@ async def add_item_start(message: Message, state: FSMContext):
     # Замени URL ниже на свой, когда развернешь сайт. Пока для теста поставим Google.
     kb.row(InlineKeyboardButton(
         text="🌐 Открыть Web-Админку", 
-        web_app=WebAppInfo(url="https://твой-сайт.com/admin"))
+        web_app=WebAppInfo(url="https://my-portfolio-bot-io0y.onrender.com"))
     )
     kb.row(InlineKeyboardButton(text="➕ Добавить вручную (текст)", callback_data="add_manual"))
     
