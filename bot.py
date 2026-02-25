@@ -81,12 +81,30 @@ async def show_category_items(callback: CallbackQuery):
     category = callback.data.split('_')[1]
     items = await get_items_by_category(category)
     
+    # СПЕЦИАЛЬНАЯ ЛОГИКА ДЛЯ БОТОВ (Вывод списком)
+    if category == "bots":
+        text = "🤖 **СПИСОК РАЗРАБОТАННЫХ БОТОВ**\n\n"
+        text += "🔗 Основной проект: @Bager_godbot\n\n"
+        
+        kb = InlineKeyboardBuilder()
+        if items:
+            text += "➕ **Дополнительные работы:**\n"
+            for item in items:
+                text += f"▪️ **{item.name}**\n{item.description}\n\n"
+                if callback.from_user.id == ADMIN_ID:
+                    kb.row(InlineKeyboardButton(text=f"🗑 Удалить {item.name}", callback_data=f"delete_{item.id}"))
+        
+        kb.row(InlineKeyboardButton(text="⬅️ Назад в категории", callback_data="open_portfolio"))
+        await callback.message.delete()
+        await callback.message.answer(text=text, reply_markup=kb.as_markup(), parse_mode="Markdown")
+        return
+
+    # ЛОГИКА ДЛЯ ОСТАЛЬНЫХ (Карточки с фото)
     if not items:
         await callback.answer("В этом разделе пока пусто.", show_alert=True)
         return
 
     await callback.message.delete()
-    
     for item in items:
         item_kb = InlineKeyboardBuilder()
         if callback.from_user.id == ADMIN_ID:
@@ -95,34 +113,21 @@ async def show_category_items(callback: CallbackQuery):
         
         caption = f"🔥 **{item.name}**\n\n{item.description}"
         
-        # ПРОВЕРКА: Если фото есть - шлем фото, если нет - только текст
         if item.photo_id:
-            await callback.message.answer_photo(
-                photo=item.photo_id,
-                caption=caption,
-                reply_markup=item_kb.as_markup(),
-                parse_mode="Markdown"
-            )
+            await callback.message.answer_photo(photo=item.photo_id, caption=caption, reply_markup=item_kb.as_markup(), parse_mode="Markdown")
         else:
-            await callback.message.answer(
-                text=caption,
-                reply_markup=item_kb.as_markup(),
-                parse_mode="Markdown"
-            )
+            await callback.message.answer(text=caption, reply_markup=item_kb.as_markup(), parse_mode="Markdown")
+    
     await callback.answer()
 
 # --- АДМИН-ФУНКЦИИ ---
 
 @dp.message(Command("admin"))
 async def admin_panel(message: Message):
-    if message.from_user.id != ADMIN_ID:
-        return
+    if message.from_user.id != ADMIN_ID: return
     kb = InlineKeyboardBuilder()
-    kb.row(InlineKeyboardButton(
-        text="🌐 Открыть Web-Админку", 
-        web_app=WebAppInfo(url="https://my-portfolio-bot-io0y.onrender.com"))
-    )
-    kb.row(InlineKeyboardButton(text="➕ Добавить вручную (текст)", callback_data="add_manual"))
+    kb.row(InlineKeyboardButton(text="🌐 Открыть Web-Админку", web_app=WebAppInfo(url="https://my-portfolio-bot-io0y.onrender.com")))
+    kb.row(InlineKeyboardButton(text="➕ Добавить вручную", callback_data="add_manual"))
     await message.answer("🛠 **Панель управления**", reply_markup=kb.as_markup())
 
 @dp.callback_query(F.data == "add_manual")
@@ -147,10 +152,8 @@ async def add_item_name(message: Message, state: FSMContext):
 async def add_item_desc(message: Message, state: FSMContext):
     await state.update_data(description=message.text)
     await state.set_state(AddItem.photo)
-    
     kb = InlineKeyboardBuilder()
     kb.row(InlineKeyboardButton(text="⏩ Пропустить фото", callback_data="skip_photo"))
-    
     await message.answer("Отправьте фото или нажмите кнопку пропуска:", reply_markup=kb.as_markup())
 
 @dp.callback_query(F.data == "skip_photo")
@@ -158,12 +161,7 @@ async def skip_photo_handler(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     async with async_session() as session:
         async with session.begin():
-            new_item = Item(
-                name=data['name'],
-                description=data['description'],
-                category=data['category'],
-                photo_id=None
-            )
+            new_item = Item(name=data['name'], description=data['description'], category=data['category'], photo_id=None)
             session.add(new_item)
     await callback.message.answer("✅ Работа добавлена без фотографии!")
     await state.clear()
@@ -175,12 +173,7 @@ async def add_item_photo(message: Message, state: FSMContext):
     data = await state.get_data()
     async with async_session() as session:
         async with session.begin():
-            new_item = Item(
-                name=data['name'],
-                description=data['description'],
-                category=data['category'],
-                photo_id=photo_id
-            )
+            new_item = Item(name=data['name'], description=data['description'], category=data['category'], photo_id=photo_id)
             session.add(new_item)
     await message.answer("✅ Работа успешно добавлена!")
     await state.clear()
