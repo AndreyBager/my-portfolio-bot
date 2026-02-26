@@ -81,6 +81,53 @@ async def show_category_items(callback: CallbackQuery):
     category = callback.data.split('_')[1]
     items = await get_items_by_category(category)
     
+    if category == "bots":
+        # Убираем Markdown из основного текста, чтобы не падал
+        text = "🤖 СПИСОК РАЗРАБОТАННЫХ БОТОВ\n\n"
+        text += "🔗 Основной проект: @Bager_godbot\n\n"
+        
+        kb = InlineKeyboardBuilder()
+        if items:
+            text += "➕ Дополнительные работы:\n"
+            for item in items:
+                # Очищаем название и описание от символов, которые ломают разметку
+                safe_name = item.name.replace("_", " ").replace("*", "")
+                safe_desc = item.description.replace("_", " ").replace("*", "")
+                text += f"▪️ {safe_name}\n{safe_desc}\n\n"
+                
+                if callback.from_user.id == ADMIN_ID:
+                    kb.row(InlineKeyboardButton(text=f"🗑 Удалить {item.name}", callback_data=f"delete_{item.id}"))
+        
+        kb.row(InlineKeyboardButton(text="⬅️ Назад в категории", callback_data="open_portfolio"))
+        
+        await callback.message.delete()
+        # Отправляем без parse_mode, чтобы символы не ломали сообщение
+        await callback.message.answer(text=text, reply_markup=kb.as_markup())
+        return
+
+    # Логика для остальных категорий (сайты/дизайн)
+    if not items:
+        await callback.answer("В этом разделе пока пусто.", show_alert=True)
+        return
+
+    await callback.message.delete()
+    for item in items:
+        item_kb = InlineKeyboardBuilder()
+        if callback.from_user.id == ADMIN_ID:
+            item_kb.row(InlineKeyboardButton(text="🗑 Удалить", callback_data=f"delete_{item.id}"))
+        item_kb.row(InlineKeyboardButton(text="⬅️ Назад в категории", callback_data="open_portfolio"))
+        
+        # Очищаем и здесь на всякий случай
+        safe_name = item.name.replace("_", " ").replace("*", "")
+        caption = f"🔥 {safe_name}\n\n{item.description}"
+        
+        if item.photo_id:
+            await callback.message.answer_photo(photo=item.photo_id, caption=caption, reply_markup=item_kb.as_markup())
+        else:
+            await callback.message.answer(text=caption, reply_markup=item_kb.as_markup())
+    
+    await callback.answer()
+    
     # СПЕЦИАЛЬНАЯ ЛОГИКА ДЛЯ БОТОВ (Вывод списком)
     if category == "bots":
         text = "🤖 **СПИСОК РАЗРАБОТАННЫХ БОТОВ**\n\n"
@@ -191,3 +238,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
